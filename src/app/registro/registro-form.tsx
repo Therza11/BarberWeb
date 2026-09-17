@@ -1,19 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Label, Select } from "@/components/ui/field";
+import { Field, Input, Label } from "@/components/ui/field";
 
-export function LoginForm() {
+export function RegistroForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/panel";
 
-  const [tipo, setTipo] = useState<"barbero" | "negocio">("barbero");
+  const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [telefono, setTelefono] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -21,20 +20,33 @@ export function LoginForm() {
     e.preventDefault();
     setError(null);
     setEnviando(true);
-    try {
-      const res = await signIn("credentials", {
-        email,
-        password,
-        tipo,
-        redirect: false,
-      });
 
-      if (!res || res.error) {
-        setError("Email o contraseña incorrectos");
+    try {
+      const res = await fetch("/api/negocios/registro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, email, password, telefono }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo crear el negocio");
         return;
       }
 
-      router.push(callbackUrl);
+      const signInRes = await signIn("credentials", {
+        email,
+        password,
+        tipo: "negocio",
+        redirect: false,
+      });
+
+      if (!signInRes || signInRes.error) {
+        router.push("/login");
+        return;
+      }
+
+      router.push("/panel/negocio");
       router.refresh();
     } finally {
       setEnviando(false);
@@ -44,14 +56,13 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
       <Field>
-        <Label>Tipo de cuenta</Label>
-        <Select
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as "barbero" | "negocio")}
-        >
-          <option value="barbero">Barbero</option>
-          <option value="negocio">Negocio</option>
-        </Select>
+        <Label>Nombre del negocio</Label>
+        <Input required value={nombre} onChange={(e) => setNombre(e.target.value)} />
+      </Field>
+
+      <Field>
+        <Label>Teléfono (opcional)</Label>
+        <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
       </Field>
 
       <Field>
@@ -69,6 +80,7 @@ export function LoginForm() {
         <Input
           type="password"
           required
+          minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -77,13 +89,13 @@ export function LoginForm() {
       {error && <p className="text-sm text-danger">{error}</p>}
 
       <Button type="submit" disabled={enviando} className="mt-2 w-full">
-        {enviando ? "Ingresando..." : "Ingresar"}
+        {enviando ? "Creando..." : "Crear cuenta"}
       </Button>
 
       <p className="text-center text-sm text-fg-muted">
-        ¿Tenés una barbería?{" "}
-        <a href="/registro" className="text-accent">
-          Registrala
+        ¿Ya tenés cuenta?{" "}
+        <a href="/login" className="text-accent">
+          Ingresar
         </a>
       </p>
     </form>
