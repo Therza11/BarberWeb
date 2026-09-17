@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { puedeGestionarTurnos } from "@/lib/permisos";
 
 async function verificarPropietario(id: string, barberoId: string) {
   const disponibilidad = await prisma.disponibilidad.findUnique({
@@ -15,7 +16,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session || session.user.role !== "BARBERO" || !session.user.barberoId) {
+  if (!session || !puedeGestionarTurnos(session) || !session.user.barberoId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -49,7 +50,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session || session.user.role !== "BARBERO" || !session.user.barberoId) {
+  if (!session || !puedeGestionarTurnos(session) || !session.user.barberoId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

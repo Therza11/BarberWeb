@@ -14,6 +14,14 @@ export default async function PanelLayout({
       <header className="flex items-center justify-between border-b border-border px-4 py-4">
         <Brand href="/panel" />
         <div className="flex items-center gap-4">
+          {session?.user?.esIndependiente && (
+            <a
+              href={session.user.role === "NEGOCIO" ? "/panel/barbero" : "/panel/negocio"}
+              className="text-sm text-accent"
+            >
+              {session.user.role === "NEGOCIO" ? "Ver mis turnos" : "Ver mi negocio"}
+            </a>
+          )}
           <span className="text-sm text-fg-muted">{session?.user?.name}</span>
           <LogoutButton />
         </div>

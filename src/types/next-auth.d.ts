@@ -7,6 +7,7 @@ declare module "next-auth" {
     role: Rol;
     negocioId?: string;
     barberoId?: string;
+    esIndependiente?: boolean;
   }
 
   interface Session {
@@ -14,6 +15,7 @@ declare module "next-auth" {
       role?: Rol;
       negocioId?: string;
       barberoId?: string;
+      esIndependiente?: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -23,6 +25,7 @@ declare module "@auth/core/types" {
     role: Rol;
     negocioId?: string;
     barberoId?: string;
+    esIndependiente?: boolean;
   }
 
   interface Session {
@@ -30,6 +33,7 @@ declare module "@auth/core/types" {
       role?: Rol;
       negocioId?: string;
       barberoId?: string;
+      esIndependiente?: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -39,6 +43,7 @@ declare module "next-auth/jwt" {
     role?: Rol;
     negocioId?: string;
     barberoId?: string;
+    esIndependiente?: boolean;
   }
 }
 
@@ -47,5 +52,6 @@ declare module "@auth/core/jwt" {
     role?: Rol;
     negocioId?: string;
     barberoId?: string;
+    esIndependiente?: boolean;
   }
 }

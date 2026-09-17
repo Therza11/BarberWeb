@@ -32,12 +32,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const ok = await bcrypt.compare(password, negocio.passwordHash);
           if (!ok) return null;
 
+          // Barbero independiente: el negocio y el barbero son la misma
+          // persona (mismo email), creados juntos en /registro. Le damos
+          // acceso tambien al panel de turnos sin pedir un segundo login.
+          const barberoPropio = await prisma.barbero.findFirst({
+            where: { negocioId: negocio.id, email: negocio.email, activo: true },
+            select: { id: true },
+          });
+
           return {
             id: negocio.id,
             email: negocio.email,
             name: negocio.nombre,
             role: "NEGOCIO" as const,
             negocioId: negocio.id,
+            barberoId: barberoPropio?.id,
+            esIndependiente: Boolean(barberoPropio),
           };
         }
 
@@ -46,6 +56,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const ok = await bcrypt.compare(password, barbero.passwordHash);
         if (!ok) return null;
 
+        const negocioPropio = await prisma.negocio.findFirst({
+          where: { id: barbero.negocioId, email: barbero.email, activo: true },
+          select: { id: true },
+        });
+
         return {
           id: barbero.id,
           email: barbero.email,
@@ -53,6 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: "BARBERO" as const,
           barberoId: barbero.id,
           negocioId: barbero.negocioId,
+          esIndependiente: Boolean(negocioPropio),
         };
       },
     }),

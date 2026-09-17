@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { puedeGestionarTurnos } from "@/lib/permisos";
 
 export async function GET() {
   const session = await auth();
-  if (!session || session.user.role !== "BARBERO" || !session.user.barberoId) {
+  if (!session || !puedeGestionarTurnos(session) || !session.user.barberoId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

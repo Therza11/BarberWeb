@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { puedeGestionarNegocio } from "@/lib/permisos";
 
 export async function GET() {
   const session = await auth();
-  if (!session || session.user.role !== "NEGOCIO" || !session.user.negocioId) {
+  if (!session || !puedeGestionarNegocio(session) || !session.user.negocioId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

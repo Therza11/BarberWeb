@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Label } from "@/components/ui/field";
+import { Field, Input, Label, Select } from "@/components/ui/field";
 
 export function RegistroForm() {
   const router = useRouter();
 
+  const [tipo, setTipo] = useState<"equipo" | "independiente">("equipo");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +26,13 @@ export function RegistroForm() {
       const res = await fetch("/api/negocios/registro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, password, telefono }),
+        body: JSON.stringify({
+          nombre,
+          email,
+          password,
+          telefono,
+          independiente: tipo === "independiente",
+        }),
       });
       const data = await res.json();
 
@@ -56,7 +63,15 @@ export function RegistroForm() {
   return (
     <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
       <Field>
-        <Label>Nombre del negocio</Label>
+        <Label>¿Cómo trabajás?</Label>
+        <Select value={tipo} onChange={(e) => setTipo(e.target.value as "equipo" | "independiente")}>
+          <option value="equipo">Tengo una barbería con equipo</option>
+          <option value="independiente">Trabajo solo (barbero independiente)</option>
+        </Select>
+      </Field>
+
+      <Field>
+        <Label>{tipo === "independiente" ? "Tu nombre" : "Nombre del negocio"}</Label>
         <Input required value={nombre} onChange={(e) => setNombre(e.target.value)} />
       </Field>
 

@@ -13,6 +13,7 @@ export default {
         token.role = user.role;
         token.negocioId = user.negocioId;
         token.barberoId = user.barberoId;
+        token.esIndependiente = user.esIndependiente;
       }
       return token;
     },
@@ -20,6 +21,7 @@ export default {
       if (token.role) session.user.role = token.role;
       session.user.negocioId = token.negocioId;
       session.user.barberoId = token.barberoId;
+      session.user.esIndependiente = token.esIndependiente;
       return session;
     },
   },

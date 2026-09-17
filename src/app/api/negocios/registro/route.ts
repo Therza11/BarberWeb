@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     password?: string;
     telefono?: string;
     direccion?: string;
+    independiente?: boolean;
   };
   try {
     body = await request.json();
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const { nombre, email, password, telefono, direccion } = body;
+  const { nombre, email, password, telefono, direccion, independiente } = body;
 
   if (!nombre || !email || !password) {
     return NextResponse.json(
@@ -70,6 +71,21 @@ export async function POST(request: NextRequest) {
         direccion,
       },
     });
+
+    if (independiente) {
+      // Barbero independiente: crea tambien su propio registro de Barbero,
+      // con el mismo email/contraseña, para que un solo login le de acceso
+      // tanto al panel de negocio como al de turnos (ver src/auth.ts).
+      await prisma.barbero.create({
+        data: {
+          negocioId: negocio.id,
+          nombre,
+          email,
+          passwordHash,
+          telefono,
+        },
+      });
+    }
 
     return NextResponse.json(
       { id: negocio.id, slug: negocio.slug, email: negocio.email },

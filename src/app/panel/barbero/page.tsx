@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { puedeGestionarTurnos } from "@/lib/permisos";
 import { DisponibilidadPanel } from "./disponibilidad-panel";
 import { MisTurnos } from "./mis-turnos";
 
 export default async function PanelBarberoPage() {
   const session = await auth();
-  if (!session || session.user.role !== "BARBERO") redirect("/login");
+  if (!puedeGestionarTurnos(session)) redirect("/login");
 
   return (
     <div>

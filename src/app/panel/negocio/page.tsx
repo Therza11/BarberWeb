@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { puedeGestionarNegocio } from "@/lib/permisos";
 import { ComisionesPanel } from "./comisiones-panel";
 import { EquipoPanel } from "./equipo-panel";
 import { ServiciosPanel } from "./servicios-panel";
@@ -7,7 +8,7 @@ import { ReporteComisiones } from "./reporte-comisiones";
 
 export default async function PanelNegocioPage() {
   const session = await auth();
-  if (!session || session.user.role !== "NEGOCIO") redirect("/login");
+  if (!puedeGestionarNegocio(session)) redirect("/login");
 
   return (
     <div>
