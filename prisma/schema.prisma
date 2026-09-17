@@ -43,6 +43,7 @@ model Negocio {
   email     String   @unique
   passwordHash String
   direccion String?
+  ciudad    String?
   activo    Boolean  @default(true)
   creadoEn  DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -50,6 +51,7 @@ model Negocio {
   barberos  Barbero[]
   servicios Servicio[]
 
+  @@index([ciudad])
   @@map("negocios")
 }
 

@@ -20,9 +20,12 @@ export default function Home() {
           Disponibilidad en tiempo real, confirmación y cancelación por email,
           y comisiones por barbero, todo en un solo lugar.
         </p>
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link href="/barberias">
+            <Button>Buscar barberías</Button>
+          </Link>
           <Link href="/login">
-            <Button>Ingresar a mi negocio</Button>
+            <Button variant="outline">Ingresar a mi negocio</Button>
           </Link>
         </div>
       </main>

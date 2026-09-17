@@ -14,6 +14,8 @@ export function RegistroForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -31,6 +33,8 @@ export function RegistroForm() {
           email,
           password,
           telefono,
+          ciudad,
+          direccion: direccion || undefined,
           independiente: tipo === "independiente",
         }),
       });
@@ -73,6 +77,21 @@ export function RegistroForm() {
       <Field>
         <Label>{tipo === "independiente" ? "Tu nombre" : "Nombre del negocio"}</Label>
         <Input required value={nombre} onChange={(e) => setNombre(e.target.value)} />
+      </Field>
+
+      <Field>
+        <Label>Ciudad</Label>
+        <Input
+          required
+          placeholder="Ej. Buenos Aires"
+          value={ciudad}
+          onChange={(e) => setCiudad(e.target.value)}
+        />
+      </Field>
+
+      <Field>
+        <Label>Dirección (opcional)</Label>
+        <Input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
       </Field>
 
       <Field>

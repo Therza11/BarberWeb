@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     password?: string;
     telefono?: string;
     direccion?: string;
+    ciudad?: string;
     independiente?: boolean;
   };
   try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const { nombre, email, password, telefono, direccion, independiente } = body;
+  const { nombre, email, password, telefono, direccion, ciudad, independiente } = body;
 
   if (!nombre || !email || !password) {
     return NextResponse.json(
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
         passwordHash,
         telefono,
         direccion,
+        ciudad,
       },
     });
 

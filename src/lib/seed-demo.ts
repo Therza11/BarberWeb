@@ -9,7 +9,7 @@ export async function seedDemoData(prisma: PrismaClient) {
 
   const negocio = await prisma.negocio.upsert({
     where: { slug: "barberia-central" },
-    update: {},
+    update: { ciudad: "Buenos Aires" },
     create: {
       nombre: "Barbería Central",
       slug: "barberia-central",
@@ -17,6 +17,7 @@ export async function seedDemoData(prisma: PrismaClient) {
       email: "contacto@barberiacentral.com",
       passwordHash,
       direccion: "Av. Siempre Viva 123",
+      ciudad: "Buenos Aires",
     },
   });
 
