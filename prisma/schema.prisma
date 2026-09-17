@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EstadoReserva {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  COMPLETADA
+  NO_ASISTIO
+}
+
+enum CanalNotificacion {
+  WHATSAPP
+  EMAIL
+}
+
+enum TipoNotificacion {
+  CONFIRMACION
+  RECORDATORIO
+  CANCELACION
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIADA
+  FALLIDA
+}
+
+model Negocio {
+  id        String   @id @default(uuid())
+  nombre    String
+  slug      String   @unique
+  telefono  String?
+  email     String   @unique
+  passwordHash String
+  direccion String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  barberos  Barbero[]
+  servicios Servicio[]
+
+  @@map("negocios")
+}
+
+model Barbero {
+  id        String   @id @default(uuid())
+  negocioId String
+  nombre    String
+  email     String   @unique
+  passwordHash String
+  telefono  String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  negocio        Negocio         @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  disponibilidades Disponibilidad[]
+  reservas       Reserva[]
+  comisiones     Comision[]
+
+  @@index([negocioId])
+  @@map("barberos")
+}
+
+model Servicio {
+  id             String   @id @default(uuid())
+  negocioId      String
+  nombre         String
+  descripcion    String?
+  duracionMin    Int
+  precio         Decimal  @db.Decimal(10, 2)
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
+  negocio    Negocio    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  reservas   Reserva[]
+  comisiones Comision[]
+
+  @@index([negocioId])
+  @@map("servicios")
+}
+
+// Disponibilidad recurrente de un barbero (ej. Lunes 09:00-18:00)
+model Disponibilidad {
+  id           String   @id @default(uuid())
+  barberoId    String
+  diaSemana    Int      // 0 = Domingo ... 6 = Sabado
+  horaInicio   String   // formato "HH:mm"
+  horaFin      String   // formato "HH:mm"
+  activo       Boolean  @default(true)
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  barbero Barbero @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+
+  @@index([barberoId])
+  @@map("disponibilidades")
+}
+
+model Reserva {
+  id              String        @id @default(uuid())
+  barberoId       String
+  servicioId      String
+  clienteNombre   String
+  clienteTelefono String
+  clienteEmail    String
+  fecha           DateTime      @db.Date
+  hora            String        // formato "HH:mm"
+  estado          EstadoReserva @default(PENDIENTE)
+  token           String        @unique @default(uuid())
+  creadoEn        DateTime      @default(now())
+  actualizadoEn   DateTime      @updatedAt
+
+  // Snapshot de la comision al momento de completar el turno (Fase 4). Se
+  // copia desde la regla vigente en Comision para no alterar el historial
+  // si la regla cambia despues.
+  comisionPorcentaje Decimal? @db.Decimal(5, 2)
+  comisionMontoFijo  Decimal? @db.Decimal(10, 2)
+  comisionMonto      Decimal? @db.Decimal(10, 2)
+
+  barbero       Barbero        @relation(fields: [barberoId], references: [id], onDelete: Restrict)
+  servicio      Servicio       @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  notificaciones Notificacion[]
+
+  // Regla de concurrencia (v2.0): un mismo barbero no puede tener dos
+  // reservas activas en la misma fecha y hora. Se aplica a nivel de base
+  // de datos, no solo en la capa de aplicacion.
+  @@unique([barberoId, fecha, hora], name: "turno_unico_por_barbero")
+  @@index([servicioId])
+  @@map("reservas")
+}
+
+// Regla de comision vigente por barbero+servicio (definida por el negocio).
+// El monto realmente ganado en cada turno se copia a Reserva.comisionMonto
+// al completarse, no se calcula desde aca en el momento de la consulta.
+model Comision {
+  id           String   @id @default(uuid())
+  barberoId    String
+  servicioId   String
+  porcentaje   Decimal? @db.Decimal(5, 2) // ej. 40.00 = 40%
+  montoFijo    Decimal? @db.Decimal(10, 2)
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  barbero  Barbero  @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+  servicio Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+
+  @@unique([barberoId, servicioId])
+  @@index([barberoId])
+  @@index([servicioId])
+  @@map("comisiones")
+}
+
+model Notificacion {
+  id          String             @id @default(uuid())
+  reservaId   String
+  tipo        TipoNotificacion
+  canal       CanalNotificacion
+  estado      EstadoNotificacion @default(PENDIENTE)
+  destinatario String
+  enviadaEn   DateTime?
+  error       String?
+  creadoEn    DateTime           @default(now())
+
+  reserva Reserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+
+  @@index([reservaId])
+  @@map("notificaciones")
+}

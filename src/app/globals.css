@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #14100c;
+  --bg-elevated: #1c1712;
+  --bg-card: #221b14;
+  --fg: #f3ead9;
+  --fg-muted: #a99a83;
+  --border: rgba(243, 234, 217, 0.12);
+  --accent: #c9a24a;
+  --accent-hover: #ddb95c;
+  --accent-fg: #14100c;
+  --danger: #c0503f;
+  --danger-fg: #f3ead9;
+  --success: #5a9a6f;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-card: var(--bg-card);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-success: var(--success);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
