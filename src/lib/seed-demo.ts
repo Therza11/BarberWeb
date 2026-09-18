@@ -34,29 +34,96 @@ export async function seedDemoData(prisma: PrismaClient) {
     },
   });
 
-  const corteClasico = await prisma.servicio.upsert({
+  // Servicios base
+  const corte = await prisma.servicio.upsert({
     where: { id: "seed-servicio-corte" },
-    update: {},
+    update: { nombre: "Corte de pelo", duracionMin: 30, precio: 5000 },
     create: {
       id: "seed-servicio-corte",
       negocioId: negocio.id,
-      nombre: "Corte clásico",
-      descripcion: "Corte de cabello tradicional",
+      nombre: "Corte de pelo",
+      descripcion: "Corte de cabello",
       duracionMin: 30,
       precio: 5000,
     },
   });
 
+  const barba = await prisma.servicio.upsert({
+    where: { id: "seed-servicio-barba" },
+    update: {},
+    create: {
+      id: "seed-servicio-barba",
+      negocioId: negocio.id,
+      nombre: "Barba",
+      descripcion: "Arreglo y perfilado de barba",
+      duracionMin: 20,
+      precio: 3000,
+    },
+  });
+
+  const cejas = await prisma.servicio.upsert({
+    where: { id: "seed-servicio-cejas" },
+    update: {},
+    create: {
+      id: "seed-servicio-cejas",
+      negocioId: negocio.id,
+      nombre: "Cejas",
+      descripcion: "Perfilado de cejas",
+      duracionMin: 10,
+      precio: 1500,
+    },
+  });
+
+  // Combinaciones
   const corteBarba = await prisma.servicio.upsert({
     where: { id: "seed-servicio-corte-barba" },
-    update: {},
+    update: { nombre: "Corte + Barba", duracionMin: 45, precio: 7500 },
     create: {
       id: "seed-servicio-corte-barba",
       negocioId: negocio.id,
       nombre: "Corte + Barba",
       descripcion: "Corte de cabello y arreglo de barba",
       duracionMin: 45,
-      precio: 8000,
+      precio: 7500,
+    },
+  });
+
+  const corteCejas = await prisma.servicio.upsert({
+    where: { id: "seed-servicio-corte-cejas" },
+    update: {},
+    create: {
+      id: "seed-servicio-corte-cejas",
+      negocioId: negocio.id,
+      nombre: "Corte + Cejas",
+      descripcion: "Corte de cabello y perfilado de cejas",
+      duracionMin: 35,
+      precio: 6000,
+    },
+  });
+
+  const barbaCejas = await prisma.servicio.upsert({
+    where: { id: "seed-servicio-barba-cejas" },
+    update: {},
+    create: {
+      id: "seed-servicio-barba-cejas",
+      negocioId: negocio.id,
+      nombre: "Barba + Cejas",
+      descripcion: "Arreglo de barba y perfilado de cejas",
+      duracionMin: 25,
+      precio: 4000,
+    },
+  });
+
+  const combo = await prisma.servicio.upsert({
+    where: { id: "seed-servicio-combo" },
+    update: {},
+    create: {
+      id: "seed-servicio-combo",
+      negocioId: negocio.id,
+      nombre: "Corte + Barba + Cejas",
+      descripcion: "El combo completo",
+      duracionMin: 55,
+      precio: 9000,
     },
   });
 
@@ -81,7 +148,7 @@ export async function seedDemoData(prisma: PrismaClient) {
     create: {
       id: "seed-comision-corte",
       barberoId: barbero.id,
-      servicioId: corteClasico.id,
+      servicioId: corte.id,
       porcentaje: 40,
     },
   });
@@ -100,7 +167,15 @@ export async function seedDemoData(prisma: PrismaClient) {
   return {
     negocio: negocio.slug,
     barbero: barbero.nombre,
-    servicios: [corteClasico.nombre, corteBarba.nombre],
+    servicios: [
+      corte.nombre,
+      barba.nombre,
+      cejas.nombre,
+      corteBarba.nombre,
+      corteCejas.nombre,
+      barbaCejas.nombre,
+      combo.nombre,
+    ],
     credencialesDemo: {
       negocio: { email: negocio.email, password: PASSWORD_DEMO },
       barbero: { email: barbero.email, password: PASSWORD_DEMO },
