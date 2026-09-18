@@ -24,7 +24,13 @@ export default async function ReservarPage({
       },
       servicios: {
         where: { activo: true },
-        select: { id: true, nombre: true, duracionMin: true, precio: true },
+        select: {
+          id: true,
+          nombre: true,
+          duracionMin: true,
+          precio: true,
+          aDomicilio: true,
+        },
       },
     },
   });

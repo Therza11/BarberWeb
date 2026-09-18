@@ -48,7 +48,7 @@ export async function POST(
           id: true,
           barberoId: true,
           estado: true,
-          servicio: { select: { duracionMin: true } },
+          servicio: { select: { duracionMin: true, aDomicilio: true, tiempoTrasladoMin: true } },
         },
       });
 
@@ -70,6 +70,9 @@ export async function POST(
         fecha: fechaColumna,
         hora,
         duracionMin: reserva.servicio.duracionMin,
+        bufferTrasladoMin: reserva.servicio.aDomicilio
+          ? reserva.servicio.tiempoTrasladoMin ?? 0
+          : 0,
         excluirReservaId: reserva.id,
       });
 

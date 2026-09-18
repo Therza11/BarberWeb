@@ -13,6 +13,7 @@ type Reserva = {
   hora: string;
   estado: string;
   clienteNombre: string;
+  direccionCliente: string | null;
   negocio: string;
   barbero: string;
   servicio: string;
@@ -138,6 +139,9 @@ export function ReservaDetalle({ token }: { token: string }) {
         <Row label="Barbero" value={reserva.barbero} />
         <Row label="Servicio" value={`${reserva.servicio} (${reserva.duracionMin} min) - $${reserva.precio}`} />
         <Row label="Fecha" value={`${reserva.fecha} a las ${reserva.hora}`} />
+        {reserva.direccionCliente && (
+          <Row label="Dirección" value={reserva.direccionCliente} />
+        )}
       </Card>
 
       {mensaje && <p className="mt-4 text-sm text-fg-muted">{mensaje}</p>}

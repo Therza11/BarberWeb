@@ -10,6 +10,8 @@ type Servicio = {
   nombre: string;
   duracionMin: number;
   precio: string;
+  aDomicilio: boolean;
+  tiempoTrasladoMin: number | null;
   activo: boolean;
 };
 
@@ -21,6 +23,8 @@ export function ServiciosPanel() {
   const [nombre, setNombre] = useState("");
   const [duracionMin, setDuracionMin] = useState("30");
   const [precio, setPrecio] = useState("");
+  const [aDomicilio, setADomicilio] = useState(false);
+  const [tiempoTrasladoMin, setTiempoTrasladoMin] = useState("15");
   const [enviando, setEnviando] = useState(false);
 
   async function cargar() {
@@ -51,6 +55,8 @@ export function ServiciosPanel() {
           nombre,
           duracionMin: Number(duracionMin),
           precio: Number(precio),
+          aDomicilio,
+          tiempoTrasladoMin: aDomicilio ? Number(tiempoTrasladoMin) : undefined,
         }),
       });
       const data = await res.json();
@@ -60,6 +66,7 @@ export function ServiciosPanel() {
       }
       setNombre("");
       setPrecio("");
+      setADomicilio(false);
       await cargar();
     } finally {
       setEnviando(false);
@@ -109,6 +116,29 @@ export function ServiciosPanel() {
             />
           </Field>
 
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={aDomicilio}
+              onChange={(e) => setADomicilio(e.target.checked)}
+            />
+            A domicilio
+          </label>
+
+          {aDomicilio && (
+            <Field>
+              <Label>Traslado (min)</Label>
+              <Input
+                type="number"
+                min="1"
+                required
+                className="w-24"
+                value={tiempoTrasladoMin}
+                onChange={(e) => setTiempoTrasladoMin(e.target.value)}
+              />
+            </Field>
+          )}
+
           <Button type="submit" disabled={enviando}>
             Agregar
           </Button>
@@ -128,6 +158,11 @@ export function ServiciosPanel() {
             <div key={s.id} className="flex items-center justify-between p-4">
               <span className={`text-sm ${s.activo ? "" : "text-fg-muted line-through"}`}>
                 {s.nombre} ({s.duracionMin} min) - ${s.precio}
+                {s.aDomicilio && (
+                  <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
+                    a domicilio (+{s.tiempoTrasladoMin} min)
+                  </span>
+                )}
               </span>
               <button
                 onClick={() => toggleActivo(s)}

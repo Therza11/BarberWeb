@@ -33,12 +33,15 @@ export async function verificarSlotLibre(
     fecha: Date;
     hora: string;
     duracionMin: number;
+    // Tiempo de traslado del turno que se esta creando/moviendo, si su
+    // servicio es a domicilio (ver Servicio.aDomicilio).
+    bufferTrasladoMin?: number;
     excluirReservaId?: string;
   },
 ) {
-  const { barberoId, fecha, hora, duracionMin, excluirReservaId } = params;
+  const { barberoId, fecha, hora, duracionMin, bufferTrasladoMin = 0, excluirReservaId } = params;
   const nuevoInicio = horaAMinutos(hora);
-  const nuevoFin = nuevoInicio + duracionMin;
+  const nuevoFin = nuevoInicio + duracionMin + bufferTrasladoMin;
 
   const reservasDelDia = await tx.reserva.findMany({
     where: {
@@ -47,12 +50,16 @@ export async function verificarSlotLibre(
       estado: { in: [...ESTADOS_ACTIVOS] },
       ...(excluirReservaId ? { id: { not: excluirReservaId } } : {}),
     },
-    select: { hora: true, servicio: { select: { duracionMin: true } } },
+    select: {
+      hora: true,
+      servicio: { select: { duracionMin: true, aDomicilio: true, tiempoTrasladoMin: true } },
+    },
   });
 
   const hayConflicto = reservasDelDia.some((r) => {
     const inicio = horaAMinutos(r.hora);
-    const fin = inicio + r.servicio.duracionMin;
+    const bufferExistente = r.servicio.aDomicilio ? r.servicio.tiempoTrasladoMin ?? 0 : 0;
+    const fin = inicio + r.servicio.duracionMin + bufferExistente;
     return seSuperponen(nuevoInicio, nuevoFin, inicio, fin);
   });
 

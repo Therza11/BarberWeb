@@ -82,6 +82,8 @@ model Servicio {
   descripcion    String?
   duracionMin    Int
   precio         Decimal  @db.Decimal(10, 2)
+  aDomicilio     Boolean  @default(false)
+  tiempoTrasladoMin Int?  // solo aplica si aDomicilio = true
   activo         Boolean  @default(true)
   creadoEn       DateTime @default(now())
   actualizadoEn  DateTime @updatedAt
@@ -118,6 +120,7 @@ model Reserva {
   clienteNombre   String
   clienteTelefono String
   clienteEmail    String
+  direccionCliente String? // requerido solo si el servicio es a domicilio
   fecha           DateTime      @db.Date
   hora            String        // formato "HH:mm"
   estado          EstadoReserva @default(PENDIENTE)

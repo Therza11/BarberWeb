@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   const servicio = await prisma.servicio.findUnique({
     where: { id: servicioId },
-    select: { duracionMin: true, activo: true },
+    select: { duracionMin: true, activo: true, aDomicilio: true, tiempoTrasladoMin: true },
   });
 
   if (!servicio || !servicio.activo) {
@@ -54,16 +54,21 @@ export async function GET(request: NextRequest) {
         fecha,
         estado: { in: ["PENDIENTE", "CONFIRMADA"] },
       },
-      select: { hora: true, servicio: { select: { duracionMin: true } } },
+      select: {
+        hora: true,
+        servicio: { select: { duracionMin: true, aDomicilio: true, tiempoTrasladoMin: true } },
+      },
     }),
   ]);
 
   const ocupadas = reservasActivas.map((r) => ({
     hora: r.hora,
     duracionMin: r.servicio.duracionMin,
+    bufferTrasladoMin: r.servicio.aDomicilio ? r.servicio.tiempoTrasladoMin ?? 0 : 0,
   }));
 
-  const slots = calcularSlotsLibres(ventanas, ocupadas, servicio.duracionMin);
+  const bufferMin = servicio.aDomicilio ? servicio.tiempoTrasladoMin ?? 0 : 0;
+  const slots = calcularSlotsLibres(ventanas, ocupadas, servicio.duracionMin, 15, bufferMin);
 
   return NextResponse.json({ fecha: fechaStr, slots });
 }

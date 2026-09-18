@@ -28,6 +28,9 @@ type VentanaDisponibilidad = {
 type ReservaOcupada = {
   hora: string;
   duracionMin: number;
+  // Tiempo de traslado a sumar despues de un servicio a domicilio, para no
+  // ofrecer turnos que el barbero no llegaria a cumplir (ver Servicio.aDomicilio).
+  bufferTrasladoMin?: number;
 };
 
 /**
@@ -40,10 +43,14 @@ export function calcularSlotsLibres(
   ocupadas: ReservaOcupada[],
   duracionMin: number,
   pasoMin: number = 15,
+  // Tiempo de traslado del NUEVO turno que se esta por ofrecer (si su
+  // servicio es a domicilio), para no dejar dos domicilios pegados sin
+  // margen para viajar entre uno y otro.
+  bufferMin: number = 0,
 ): string[] {
   const ocupadasRangos = ocupadas.map((r) => {
     const inicio = horaAMinutos(r.hora);
-    return { inicio, fin: inicio + r.duracionMin };
+    return { inicio, fin: inicio + r.duracionMin + (r.bufferTrasladoMin ?? 0) };
   });
 
   const slots: string[] = [];
@@ -57,9 +64,9 @@ export function calcularSlotsLibres(
       inicioSlot + duracionMin <= finVentana;
       inicioSlot += pasoMin
     ) {
-      const finSlot = inicioSlot + duracionMin;
+      const finSlotConBuffer = inicioSlot + duracionMin + bufferMin;
       const ocupado = ocupadasRangos.some((r) =>
-        seSuperponen(inicioSlot, finSlot, r.inicio, r.fin),
+        seSuperponen(inicioSlot, finSlotConBuffer, r.inicio, r.fin),
       );
       if (!ocupado) {
         slots.push(minutosAHora(inicioSlot));

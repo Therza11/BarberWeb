@@ -18,10 +18,11 @@ export async function GET() {
     select: {
       id: true,
       clienteNombre: true,
+      direccionCliente: true,
       fecha: true,
       hora: true,
       estado: true,
-      servicio: { select: { nombre: true, precio: true } },
+      servicio: { select: { nombre: true, precio: true, aDomicilio: true } },
     },
   });
 

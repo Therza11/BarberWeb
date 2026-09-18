@@ -6,10 +6,11 @@ import { Card } from "@/components/ui/card";
 type Turno = {
   id: string;
   clienteNombre: string;
+  direccionCliente: string | null;
   fecha: string;
   hora: string;
   estado: string;
-  servicio: { nombre: string; precio: string };
+  servicio: { nombre: string; precio: string; aDomicilio: boolean };
 };
 
 export function MisTurnos() {
@@ -49,6 +50,11 @@ export function MisTurnos() {
           <span className="text-sm">
             {t.fecha} {t.hora} — {t.clienteNombre}{" "}
             <span className="text-fg-muted">({t.servicio.nombre})</span>
+            {t.servicio.aDomicilio && t.direccionCliente && (
+              <span className="mt-1 block text-xs text-accent">
+                Domicilio: {t.direccionCliente}
+              </span>
+            )}
           </span>
           <span className="flex gap-2">
             <button

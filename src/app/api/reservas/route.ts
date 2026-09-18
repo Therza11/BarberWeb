@@ -17,6 +17,7 @@ type ReservaInput = {
   clienteNombre: string;
   clienteTelefono: string;
   clienteEmail: string;
+  direccionCliente?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -27,8 +28,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const { barberoId, servicioId, fecha, hora, clienteNombre, clienteTelefono, clienteEmail } =
-    body;
+  const {
+    barberoId,
+    servicioId,
+    fecha,
+    hora,
+    clienteNombre,
+    clienteTelefono,
+    clienteEmail,
+    direccionCliente,
+  } = body;
 
   if (
     !barberoId ||
@@ -65,11 +74,23 @@ export async function POST(request: NextRequest) {
 
       const servicio = await tx.servicio.findUnique({
         where: { id: servicioId },
-        select: { id: true, activo: true, duracionMin: true },
+        select: {
+          id: true,
+          activo: true,
+          duracionMin: true,
+          aDomicilio: true,
+          tiempoTrasladoMin: true,
+        },
       });
 
       if (!servicio || !servicio.activo) {
         throw new SlotNoDisponibleError("Servicio no encontrado");
+      }
+
+      if (servicio.aDomicilio && !direccionCliente) {
+        throw new SlotNoDisponibleError(
+          "Este servicio es a domicilio: falta la direccion del cliente",
+        );
       }
 
       await verificarSlotLibre(tx, {
@@ -77,6 +98,7 @@ export async function POST(request: NextRequest) {
         fecha: fechaColumna,
         hora,
         duracionMin: servicio.duracionMin,
+        bufferTrasladoMin: servicio.aDomicilio ? servicio.tiempoTrasladoMin ?? 0 : 0,
       });
 
       const nuevaReserva = await tx.reserva.create({
@@ -88,6 +110,7 @@ export async function POST(request: NextRequest) {
           clienteNombre,
           clienteTelefono,
           clienteEmail,
+          direccionCliente: servicio.aDomicilio ? direccionCliente : undefined,
           estado: "CONFIRMADA",
         },
       });

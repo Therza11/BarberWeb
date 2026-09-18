@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Label, Select } from "@/components/ui/field";
 
 type Barbero = { id: string; nombre: string };
-type Servicio = { id: string; nombre: string; duracionMin: number; precio: string };
+type Servicio = {
+  id: string;
+  nombre: string;
+  duracionMin: number;
+  precio: string;
+  aDomicilio: boolean;
+};
 
 type Props = {
   barberos: Barbero[];
@@ -27,10 +33,13 @@ export function ReservaForm({ barberos, servicios }: Props) {
   const [clienteNombre, setClienteNombre] = useState("");
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [clienteEmail, setClienteEmail] = useState("");
+  const [direccionCliente, setDireccionCliente] = useState("");
   const [cargandoSlots, setCargandoSlots] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null);
+
+  const servicioSeleccionado = servicios.find((s) => s.id === servicioId);
 
   async function buscarSlots(nuevaFecha: string) {
     setFecha(nuevaFecha);
@@ -75,6 +84,7 @@ export function ReservaForm({ barberos, servicios }: Props) {
           clienteNombre,
           clienteTelefono,
           clienteEmail,
+          direccionCliente: servicioSeleccionado?.aDomicilio ? direccionCliente : undefined,
         }),
       });
       const data = await res.json();
@@ -150,6 +160,7 @@ export function ReservaForm({ barberos, servicios }: Props) {
           {servicios.map((s) => (
             <option key={s.id} value={s.id}>
               {s.nombre} ({s.duracionMin} min) - ${s.precio}
+              {s.aDomicilio ? " · a domicilio" : ""}
             </option>
           ))}
         </Select>
@@ -218,6 +229,17 @@ export function ReservaForm({ barberos, servicios }: Props) {
               onChange={(e) => setClienteEmail(e.target.value)}
             />
           </Field>
+
+          {servicioSeleccionado?.aDomicilio && (
+            <Field>
+              <Label>Dirección para el servicio a domicilio</Label>
+              <Input
+                required
+                value={direccionCliente}
+                onChange={(e) => setDireccionCliente(e.target.value)}
+              />
+            </Field>
+          )}
         </>
       )}
 
