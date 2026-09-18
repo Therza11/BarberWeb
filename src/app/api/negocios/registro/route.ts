@@ -13,6 +13,20 @@ function slugify(texto: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// Con el driver adapter (@prisma/adapter-pg), P2002 no trae `meta.target`
+// como en el motor clasico de Prisma - el nombre del constraint viene en el
+// mensaje de error (ej. "constraint: `negocios_slug_key`"), asi que
+// matcheamos contra eso en vez de confiar en `meta.target`.
+function esConflictoDe(error: unknown, constraintSuffix: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002" &&
+    (Array.isArray(error.meta?.target)
+      ? (error.meta.target as string[]).includes(constraintSuffix)
+      : error.message.includes(constraintSuffix))
+  );
+}
+
 export async function POST(request: NextRequest) {
   let body: {
     nombre?: string;
@@ -50,59 +64,60 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Nombre invalido" }, { status: 400 });
   }
 
-  try {
-    let slug = slugBase;
-    let intento = 0;
+  const passwordHash = await bcrypt.hash(password, 10);
 
-    // Si el slug ya existe, le agrega un sufijo numerico hasta encontrar uno libre.
-    while (await prisma.negocio.findUnique({ where: { slug }, select: { id: true } })) {
-      intento++;
-      slug = `${slugBase}-${intento}`;
-    }
+  // Reintenta con un sufijo numerico incremental si otro registro se cuela
+  // con el mismo slug entre que lo elegimos y lo insertamos (el check previo
+  // con findUnique no es atomico, esto cierra esa carrera).
+  const INTENTOS_MAX = 5;
+  for (let intento = 0; intento <= INTENTOS_MAX; intento++) {
+    const slug = intento === 0 ? slugBase : `${slugBase}-${intento}`;
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    try {
+      const negocio = await prisma.$transaction(async (tx) => {
+        const nuevoNegocio = await tx.negocio.create({
+          data: { nombre, slug, email, passwordHash, telefono, direccion, ciudad },
+        });
 
-    const negocio = await prisma.negocio.create({
-      data: {
-        nombre,
-        slug,
-        email,
-        passwordHash,
-        telefono,
-        direccion,
-        ciudad,
-      },
-    });
+        if (independiente) {
+          // Barbero independiente: crea tambien su propio registro de
+          // Barbero, con el mismo email/contraseña, para que un solo login
+          // le de acceso tanto al panel de negocio como al de turnos (ver
+          // src/auth.ts). Va en la misma transaccion que el Negocio: si el
+          // email ya esta usado por otro Barbero, no queremos un Negocio
+          // huerfano creado a medias.
+          await tx.barbero.create({
+            data: { negocioId: nuevoNegocio.id, nombre, email, passwordHash, telefono },
+          });
+        }
 
-    if (independiente) {
-      // Barbero independiente: crea tambien su propio registro de Barbero,
-      // con el mismo email/contraseña, para que un solo login le de acceso
-      // tanto al panel de negocio como al de turnos (ver src/auth.ts).
-      await prisma.barbero.create({
-        data: {
-          negocioId: negocio.id,
-          nombre,
-          email,
-          passwordHash,
-          telefono,
-        },
+        return nuevoNegocio;
       });
-    }
 
-    return NextResponse.json(
-      { id: negocio.id, slug: negocio.slug, email: negocio.email },
-      { status: 201 },
-    );
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
       return NextResponse.json(
-        { error: "Ya existe un negocio registrado con ese email" },
-        { status: 409 },
+        { id: negocio.id, slug: negocio.slug, email: negocio.email },
+        { status: 201 },
       );
+    } catch (error) {
+      if (esConflictoDe(error, "slug") && intento < INTENTOS_MAX) {
+        continue;
+      }
+      if (esConflictoDe(error, "email")) {
+        return NextResponse.json(
+          { error: "Ya existe una cuenta registrada con ese email" },
+          { status: 409 },
+        );
+      }
+      if (esConflictoDe(error, "slug")) {
+        return NextResponse.json(
+          { error: "Ya existe un negocio con un nombre muy similar, proba con otro" },
+          { status: 409 },
+        );
+      }
+      throw error;
     }
-    throw error;
   }
+
+  // Inalcanzable: el loop siempre retorna o lanza.
+  return NextResponse.json({ error: "No se pudo completar el registro" }, { status: 500 });
 }

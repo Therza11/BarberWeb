@@ -3,9 +3,18 @@ import { enviarWhatsapp } from "./whatsapp";
 import { enviarEmail } from "./email";
 import { armarMensaje } from "./mensajes";
 
-export async function procesarNotificacionesPendientes() {
+/**
+ * Procesa notificaciones PENDIENTE y las envia. Sin `reservaId`, barre TODA
+ * la tabla (uso pensado solo para el cron diario /api/cron/notificaciones).
+ * Al crear/cancelar una reserva, en cambio, se pasa `reservaId` para
+ * procesar solo esa notificacion puntual: si se barriera todo el sistema en
+ * cada request, una reserva de un negocio quedaria esperando el envio de
+ * notificaciones pendientes de OTROS negocios (o de un canal caido),
+ * arriesgando el timeout de function serverless por algo ajeno a esa reserva.
+ */
+export async function procesarNotificacionesPendientes(reservaId?: string) {
   const pendientes = await prisma.notificacion.findMany({
-    where: { estado: "PENDIENTE" },
+    where: { estado: "PENDIENTE", ...(reservaId ? { reservaId } : {}) },
     include: {
       reserva: {
         select: {

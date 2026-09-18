@@ -41,7 +41,7 @@ export async function POST(
   ]);
 
   try {
-    await procesarNotificacionesPendientes();
+    await procesarNotificacionesPendientes(reserva.id);
   } catch (error) {
     console.error("Error procesando notificaciones:", error);
   }

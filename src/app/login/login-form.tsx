@@ -6,10 +6,20 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Label, Select } from "@/components/ui/field";
 
+// Solo permite rutas relativas dentro del propio sitio, para evitar un
+// "open redirect" via ?callbackUrl=https://sitio-malicioso.com (o el
+// truco de URL protocol-relative "//sitio-malicioso.com").
+function callbackUrlSegura(valor: string | null): string {
+  if (!valor || !valor.startsWith("/") || valor.startsWith("//")) {
+    return "/panel";
+  }
+  return valor;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/panel";
+  const callbackUrl = callbackUrlSegura(searchParams.get("callbackUrl"));
 
   const [tipo, setTipo] = useState<"barbero" | "negocio">("barbero");
   const [email, setEmail] = useState("");

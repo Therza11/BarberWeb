@@ -141,8 +141,11 @@ model Reserva {
 
   // Regla de concurrencia (v2.0): un mismo barbero no puede tener dos
   // reservas activas en la misma fecha y hora. Se aplica a nivel de base
-  // de datos, no solo en la capa de aplicacion.
-  @@unique([barberoId, fecha, hora], name: "turno_unico_por_barbero")
+  // de datos, no solo en la capa de aplicacion. Implementado como indice
+  // UNICO PARCIAL (solo sobre estado PENDIENTE/CONFIRMADA) via SQL crudo
+  // en la migracion 20260918_reserva_unique_parcial, porque Prisma no
+  // soporta indices parciales en el DSL del schema. Si cambias estos
+  // campos, hay que actualizar esa migracion a mano tambien.
   @@index([servicioId])
   @@map("reservas")
 }
