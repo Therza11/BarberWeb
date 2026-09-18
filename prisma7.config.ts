@@ -11,6 +11,9 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
-    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
+    // Prisma trata "" distinto de "no configurado" y rechaza una cadena
+    // vacia con P1013 - si la variable esta seteada pero vacia (ej. dejada
+    // en blanco al cargar env vars en Vercel), la tratamos como ausente.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"] || undefined,
   },
 });
