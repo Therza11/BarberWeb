@@ -4,6 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { puedeGestionarNegocio } from "@/lib/permisos";
+import { LIMITE_BARBEROS_GRATIS } from "@/lib/planes";
 
 export async function GET() {
   const session = await auth();
@@ -47,6 +48,25 @@ export async function POST(request: NextRequest) {
       { error: "La contraseña debe tener al menos 8 caracteres" },
       { status: 400 },
     );
+  }
+
+  const negocio = await prisma.negocio.findUnique({
+    where: { id: session.user.negocioId },
+    select: { plan: true },
+  });
+
+  if (negocio?.plan === "GRATIS") {
+    const cantidadActual = await prisma.barbero.count({
+      where: { negocioId: session.user.negocioId, activo: true },
+    });
+    if (cantidadActual >= LIMITE_BARBEROS_GRATIS) {
+      return NextResponse.json(
+        {
+          error: `El plan Gratis permite hasta ${LIMITE_BARBEROS_GRATIS} barbero activo. Actualizá a Pro para agregar más.`,
+        },
+        { status: 403 },
+      );
+    }
   }
 
   try {

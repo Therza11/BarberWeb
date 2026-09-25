@@ -58,6 +58,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (aDomicilio) {
+    const negocio = await prisma.negocio.findUnique({
+      where: { id: session.user.negocioId },
+      select: { plan: true },
+    });
+    if (negocio?.plan === "GRATIS") {
+      return NextResponse.json(
+        { error: "Los servicios a domicilio requieren el plan Pro." },
+        { status: 403 },
+      );
+    }
+  }
+
   const servicio = await prisma.servicio.create({
     data: {
       negocioId: session.user.negocioId,

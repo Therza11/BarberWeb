@@ -13,6 +13,7 @@ export async function GET() {
     where: { id: session.user.negocioId },
     select: {
       nombre: true,
+      plan: true,
       barberos: { where: { activo: true }, select: { id: true, nombre: true } },
       servicios: { where: { activo: true }, select: { id: true, nombre: true } },
     },

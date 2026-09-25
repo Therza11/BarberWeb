@@ -35,6 +35,14 @@ enum EstadoNotificacion {
   FALLIDA
 }
 
+// Plan Gratis: max 1 barbero activo, sin servicios a domicilio.
+// Plan Pro: sin esos limites. El cambio de plan es manual (cobro fuera del
+// sitio) hasta que se integre una pasarela de pago.
+enum PlanNegocio {
+  GRATIS
+  PRO
+}
+
 model Negocio {
   id        String   @id @default(uuid())
   nombre    String
@@ -44,6 +52,7 @@ model Negocio {
   passwordHash String
   direccion String?
   ciudad    String?
+  plan      PlanNegocio @default(GRATIS)
   activo    Boolean  @default(true)
   creadoEn  DateTime @default(now())
   actualizadoEn DateTime @updatedAt
