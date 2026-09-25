@@ -5,6 +5,7 @@ import { puedeGestionarNegocio } from "@/lib/permisos";
 import { ComisionesPanel } from "./comisiones-panel";
 import { EquipoPanel } from "./equipo-panel";
 import { PlanBanner } from "./plan-banner";
+import { ReportesPanel } from "./reportes-panel";
 import { ServiciosPanel } from "./servicios-panel";
 import { ReporteComisiones } from "./reporte-comisiones";
 
@@ -21,7 +22,15 @@ export default async function PanelNegocioPage() {
     <div>
       <PlanBanner plan={negocio?.plan ?? "GRATIS"} />
 
-      <h1 className="font-display text-2xl font-semibold">Mi equipo</h1>
+      <h1 className="font-display text-2xl font-semibold">Reportes</h1>
+      <ReportesPanel />
+
+      <h2 className="mt-10 font-display text-xl font-semibold">
+        Detalle de turnos completados
+      </h2>
+      <ReporteComisiones />
+
+      <h1 className="mt-12 font-display text-2xl font-semibold">Mi equipo</h1>
       <EquipoPanel />
 
       <h2 className="mt-10 font-display text-xl font-semibold">Mis servicios</h2>
@@ -31,11 +40,6 @@ export default async function PanelNegocioPage() {
         Comisiones por barbero
       </h2>
       <ComisionesPanel />
-
-      <h2 className="mt-10 font-display text-xl font-semibold">
-        Reporte de turnos completados
-      </h2>
-      <ReporteComisiones />
     </div>
   );
 }
