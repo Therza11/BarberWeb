@@ -5,6 +5,7 @@ import {
   SlotNoDisponibleError,
   bloquearBarbero,
   parseFechaColumna,
+  verificarDentroDeDisponibilidad,
   verificarSlotLibre,
 } from "@/lib/reservas";
 import { procesarNotificacionesPendientes } from "@/lib/notificaciones/procesar";
@@ -92,6 +93,13 @@ export async function POST(request: NextRequest) {
           "Este servicio es a domicilio: falta la direccion del cliente",
         );
       }
+
+      await verificarDentroDeDisponibilidad(tx, {
+        barberoId,
+        fecha: fechaColumna,
+        hora,
+        duracionMin: servicio.duracionMin,
+      });
 
       await verificarSlotLibre(tx, {
         barberoId,

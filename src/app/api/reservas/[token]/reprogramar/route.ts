@@ -6,6 +6,7 @@ import {
   SlotNoDisponibleError,
   bloquearBarbero,
   parseFechaColumna,
+  verificarDentroDeDisponibilidad,
   verificarSlotLibre,
 } from "@/lib/reservas";
 
@@ -64,6 +65,13 @@ export async function POST(
       // concurrentes sobre el mismo barbero (mismo control de concurrencia
       // que al crear una reserva).
       await bloquearBarbero(tx, reserva.barberoId);
+
+      await verificarDentroDeDisponibilidad(tx, {
+        barberoId: reserva.barberoId,
+        fecha: fechaColumna,
+        hora,
+        duracionMin: reserva.servicio.duracionMin,
+      });
 
       await verificarSlotLibre(tx, {
         barberoId: reserva.barberoId,

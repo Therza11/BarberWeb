@@ -67,3 +67,36 @@ export async function verificarSlotLibre(
     throw new SlotNoDisponibleError("El horario ya no esta disponible");
   }
 }
+
+/**
+ * Lanza SlotNoDisponibleError si [hora, hora + duracionMin) no cae
+ * completamente dentro de alguna ventana de Disponibilidad activa del
+ * barbero para el dia de la semana de `fecha`. El endpoint publico de
+ * disponibilidad ya excluye estos horarios al armar la lista de slots, pero
+ * eso no bloquea una llamada directa a la API de creacion/reprogramacion -
+ * esta funcion es la que realmente lo impide a nivel de servidor.
+ */
+export async function verificarDentroDeDisponibilidad(
+  tx: TxClient,
+  params: { barberoId: string; fecha: Date; hora: string; duracionMin: number },
+) {
+  const { barberoId, fecha, hora, duracionMin } = params;
+  const diaSemana = fecha.getUTCDay();
+  const inicio = horaAMinutos(hora);
+  const fin = inicio + duracionMin;
+
+  const ventanas = await tx.disponibilidad.findMany({
+    where: { barberoId, diaSemana, activo: true },
+    select: { horaInicio: true, horaFin: true },
+  });
+
+  const dentroDeAlguna = ventanas.some((v) => {
+    const vInicio = horaAMinutos(v.horaInicio);
+    const vFin = horaAMinutos(v.horaFin);
+    return inicio >= vInicio && fin <= vFin;
+  });
+
+  if (!dentroDeAlguna) {
+    throw new SlotNoDisponibleError("El barbero no tiene disponibilidad en ese horario");
+  }
+}
