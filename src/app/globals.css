@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #14100c;
-  --bg-elevated: #1c1712;
-  --bg-card: #221b14;
+  --bg: #000000;
+  --bg-elevated: #0c0c0c;
+  --bg-card: #131313;
   --fg: #f3ead9;
   --fg-muted: #a99a83;
   --border: rgba(243, 234, 217, 0.12);
   --accent: #c9a24a;
   --accent-hover: #ddb95c;
-  --accent-fg: #14100c;
+  --accent-fg: #000000;
   --accent-deep: #96701f;
   --accent-bright: #f2d896;
   --accent-gradient: linear-gradient(
