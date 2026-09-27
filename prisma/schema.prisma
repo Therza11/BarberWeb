@@ -35,12 +35,37 @@ enum EstadoNotificacion {
   FALLIDA
 }
 
-// Plan Gratis: max 1 barbero activo, sin servicios a domicilio.
+// Plan Gratis: max 1 barbero activo, sin servicios a domicilio, sin
+// sucursales adicionales, sin dominio propio ni sena via Wompi.
 // Plan Pro: sin esos limites. El cambio de plan es manual (cobro fuera del
 // sitio) hasta que se integre una pasarela de pago.
 enum PlanNegocio {
   GRATIS
   PRO
+}
+
+// NO_APLICA: la reserva no requiere sena (negocio no la pide, o el servicio
+// se reservo antes de activarla).
+// PENDIENTE: se genero el link de pago de Wompi pero todavia no llega la
+// confirmacion (webhook). La reserva en si queda en estado PENDIENTE.
+// PAGADO: Wompi confirmo la transaccion (webhook con status APPROVED).
+// FALLIDO: Wompi rechazo/anulo la transaccion; la reserva pasa a CANCELADA.
+// ACTIVA: esperando que se libere un turno ese dia.
+// NOTIFICADA: ya se le aviso de un cupo libre (ver src/lib/lista-espera.ts) -
+// no se lo vuelve a notificar el mismo dia; si quiere seguir esperando tiene
+// que anotarse de nuevo.
+// CANCELADA: el cliente se dio de baja el mismo (via su token).
+enum EstadoListaEspera {
+  ACTIVA
+  NOTIFICADA
+  CANCELADA
+}
+
+enum EstadoPago {
+  NO_APLICA
+  PENDIENTE
+  PAGADO
+  FALLIDO
 }
 
 model Negocio {
@@ -57,16 +82,52 @@ model Negocio {
   creadoEn  DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  barberos  Barbero[]
-  servicios Servicio[]
+  // Dominio personalizado (ej. "turnos.barberiacentral.com") que un negocio
+  // Pro puede apuntar via CNAME a esta app. src/proxy.ts reescribe requests
+  // que llegan con ese Host hacia /reservar/[slug]. El alta del dominio en
+  // Vercel (Settings -> Domains) todavia es un paso manual del operador.
+  dominioPersonalizado String? @unique
+
+  // Seña/deposito obligatorio via Wompi (Colombia). Si requiereSena es true,
+  // se cobra senaPorcentaje% del precio del servicio al momento de reservar
+  // y la reserva queda PENDIENTE_PAGO hasta que el webhook de Wompi confirme
+  // el pago. Feature de plan Pro.
+  requiereSena   Boolean  @default(false)
+  senaPorcentaje Decimal? @db.Decimal(5, 2)
+
+  barberos             Barbero[]
+  servicios            Servicio[]
+  sucursales           Sucursal[]
+  conversacionesWhatsapp ConversacionWhatsapp[]
 
   @@index([ciudad])
   @@map("negocios")
 }
 
+// Sede fisica de un negocio (feature Pro). Un negocio sin filas en esta
+// tabla sigue funcionando como sede unica (su propia direccion/ciudad), sin
+// ningun cambio de comportamiento.
+model Sucursal {
+  id        String   @id @default(uuid())
+  negocioId String
+  nombre    String
+  direccion String?
+  ciudad    String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  negocio  Negocio   @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  barberos Barbero[]
+
+  @@index([negocioId])
+  @@map("sucursales")
+}
+
 model Barbero {
   id        String   @id @default(uuid())
   negocioId String
+  sucursalId String?
   nombre    String
   email     String   @unique
   passwordHash String
@@ -76,11 +137,15 @@ model Barbero {
   actualizadoEn DateTime @updatedAt
 
   negocio        Negocio         @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  sucursal       Sucursal?       @relation(fields: [sucursalId], references: [id], onDelete: SetNull)
   disponibilidades Disponibilidad[]
   reservas       Reserva[]
   comisiones     Comision[]
+  resenas        Resena[]
+  listaEspera    ListaEspera[]
 
   @@index([negocioId])
+  @@index([sucursalId])
   @@map("barberos")
 }
 
@@ -97,12 +162,39 @@ model Servicio {
   creadoEn       DateTime @default(now())
   actualizadoEn  DateTime @updatedAt
 
-  negocio    Negocio    @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  reservas   Reserva[]
-  comisiones Comision[]
+  negocio     Negocio       @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  reservas    Reserva[]
+  comisiones  Comision[]
+  listaEspera ListaEspera[]
 
   @@index([negocioId])
   @@map("servicios")
+}
+
+// Lista de espera (v2.3): un cliente pide que le avisen si se libera un
+// turno con este barbero+servicio ese dia (sin hora especifica - "avisame
+// si se abre algo"). Se dispara desde cancelar/reprogramar una Reserva (ver
+// notificarListaEspera en src/lib/lista-espera.ts). No reserva el slot, solo
+// avisa por email: el cliente igual tiene que entrar a reservar como
+// cualquiera, a la carrera contra otros clientes.
+model ListaEspera {
+  id              String            @id @default(uuid())
+  barberoId       String
+  servicioId      String
+  fecha           DateTime          @db.Date
+  clienteNombre   String
+  clienteTelefono String
+  clienteEmail    String
+  estado          EstadoListaEspera @default(ACTIVA)
+  token           String            @unique @default(uuid())
+  creadoEn        DateTime          @default(now())
+  notificadoEn    DateTime?
+
+  barbero  Barbero  @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+  servicio Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+
+  @@index([barberoId, fecha, estado])
+  @@map("lista_espera")
 }
 
 // Disponibilidad recurrente de un barbero (ej. Lunes 09:00-18:00)
@@ -144,9 +236,29 @@ model Reserva {
   comisionMontoFijo  Decimal? @db.Decimal(10, 2)
   comisionMonto      Decimal? @db.Decimal(10, 2)
 
+  // Sena/deposito via Wompi (v2.1). estadoPago NO_APLICA si el negocio no
+  // pide sena. wompiReferencia es el "reference" que se manda a Wompi y que
+  // el webhook usa para encontrar la reserva (unico por reserva).
+  estadoPago         EstadoPago @default(NO_APLICA)
+  montoSena          Decimal?   @db.Decimal(10, 2)
+  wompiReferencia    String?    @unique
+  wompiTransaccionId String?
+
+  // Turnos recurrentes (v2.2): todas las ocurrencias de una misma serie
+  // comparten serieId (generado al crear la serie, no es el id de ninguna
+  // reserva en particular). serieIndice/serieTotal son 1-based ("2 de 4")
+  // para no tener que hacer un COUNT contra la serie solo para mostrarlo.
+  // Cada ocurrencia es una Reserva independiente con su propio token: se
+  // puede cancelar/reprogramar una sin afectar a las demas. No disponible
+  // si el negocio pide sena (ver POST /api/reservas/recurrente).
+  serieId     String?
+  serieIndice Int?
+  serieTotal  Int?
+
   barbero       Barbero        @relation(fields: [barberoId], references: [id], onDelete: Restrict)
   servicio      Servicio       @relation(fields: [servicioId], references: [id], onDelete: Restrict)
   notificaciones Notificacion[]
+  resena        Resena?
 
   // Regla de concurrencia (v2.0): un mismo barbero no puede tener dos
   // reservas activas en la misma fecha y hora. Se aplica a nivel de base
@@ -156,7 +268,27 @@ model Reserva {
   // soporta indices parciales en el DSL del schema. Si cambias estos
   // campos, hay que actualizar esa migracion a mano tambien.
   @@index([servicioId])
+  @@index([serieId])
   @@map("reservas")
+}
+
+// Calificacion 1-5 estrellas + comentario opcional, dejada por el cliente
+// desde /reserva/[token] una vez que su turno esta COMPLETADA (es la unica
+// prueba de que el servicio ocurrio, ya que el cliente no tiene cuenta).
+// Una resena por reserva (@@unique en reservaId).
+model Resena {
+  id           String   @id @default(uuid())
+  reservaId    String   @unique
+  barberoId    String
+  calificacion Int      // 1 a 5, validado en la API (sin CHECK a nivel DB)
+  comentario   String?
+  creadoEn     DateTime @default(now())
+
+  reserva Reserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  barbero Barbero @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+
+  @@index([barberoId])
+  @@map("resenas")
 }
 
 // Regla de comision vigente por barbero+servicio (definida por el negocio).
@@ -195,4 +327,24 @@ model Notificacion {
 
   @@index([reservaId])
   @@map("notificaciones")
+}
+
+// Estado del chatbot de WhatsApp (v2.4) por numero de telefono (wa_id, un
+// solo numero de WhatsApp para toda la plataforma - ver src/lib/whatsapp-bot.ts).
+// `datos` acumula las respuestas del cliente a medida que avanza el flujo
+// (servicioId, barberoId, fecha, hora, nombre, email) como JSON en vez de
+// columnas separadas: son campos de un wizard transitorio, no datos de
+// negocio que se consulten despues.
+model ConversacionWhatsapp {
+  id            String   @id @default(uuid())
+  telefono      String   @unique
+  negocioId     String?
+  estado        String
+  datos         Json     @default("{}")
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  negocio Negocio? @relation(fields: [negocioId], references: [id], onDelete: SetNull)
+
+  @@map("conversaciones_whatsapp")
 }

@@ -14,7 +14,15 @@ export async function GET() {
 
   const barberos = await prisma.barbero.findMany({
     where: { negocioId: session.user.negocioId },
-    select: { id: true, nombre: true, email: true, telefono: true, activo: true },
+    select: {
+      id: true,
+      nombre: true,
+      email: true,
+      telefono: true,
+      activo: true,
+      sucursalId: true,
+      sucursal: { select: { nombre: true } },
+    },
     orderBy: { nombre: "asc" },
   });
 
@@ -27,14 +35,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  let body: { nombre?: string; email?: string; password?: string; telefono?: string };
+  let body: {
+    nombre?: string;
+    email?: string;
+    password?: string;
+    telefono?: string;
+    sucursalId?: string;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
   }
 
-  const { nombre, email, password, telefono } = body;
+  const { nombre, email, password, telefono, sucursalId } = body;
 
   if (!nombre || !email || !password) {
     return NextResponse.json(
@@ -69,6 +83,16 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (sucursalId) {
+    const sucursal = await prisma.sucursal.findUnique({
+      where: { id: sucursalId },
+      select: { negocioId: true },
+    });
+    if (!sucursal || sucursal.negocioId !== session.user.negocioId) {
+      return NextResponse.json({ error: "Sucursal invalida" }, { status: 400 });
+    }
+  }
+
   try {
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -79,6 +103,7 @@ export async function POST(request: NextRequest) {
         email,
         passwordHash,
         telefono,
+        sucursalId: sucursalId || undefined,
       },
     });
 

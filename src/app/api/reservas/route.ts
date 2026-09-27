@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
-import { prisma } from "@/lib/prisma";
-import {
-  SlotNoDisponibleError,
-  bloquearBarbero,
-  parseFechaColumna,
-  verificarDentroDeDisponibilidad,
-  verificarSlotLibre,
-} from "@/lib/reservas";
-import { procesarNotificacionesPendientes } from "@/lib/notificaciones/procesar";
+import { SlotNoDisponibleError, crearReserva, parseFechaColumna } from "@/lib/reservas";
 
 type ReservaInput = {
   barberoId: string;
@@ -65,90 +57,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const fechaColumna = parseFechaColumna(fecha);
-
   try {
-    const reserva = await prisma.$transaction(async (tx) => {
-      // Bloquea la fila del barbero para serializar reservas concurrentes
-      // sobre el mismo barbero (control de concurrencia a nivel de DB).
-      await bloquearBarbero(tx, barberoId);
-
-      const servicio = await tx.servicio.findUnique({
-        where: { id: servicioId },
-        select: {
-          id: true,
-          activo: true,
-          duracionMin: true,
-          aDomicilio: true,
-          tiempoTrasladoMin: true,
-        },
-      });
-
-      if (!servicio || !servicio.activo) {
-        throw new SlotNoDisponibleError("Servicio no encontrado");
-      }
-
-      if (servicio.aDomicilio && !direccionCliente) {
-        throw new SlotNoDisponibleError(
-          "Este servicio es a domicilio: falta la direccion del cliente",
-        );
-      }
-
-      await verificarDentroDeDisponibilidad(tx, {
-        barberoId,
-        fecha: fechaColumna,
-        hora,
-        duracionMin: servicio.duracionMin,
-      });
-
-      await verificarSlotLibre(tx, {
-        barberoId,
-        fecha: fechaColumna,
-        hora,
-        duracionMin: servicio.duracionMin,
-        bufferTrasladoMin: servicio.aDomicilio ? servicio.tiempoTrasladoMin ?? 0 : 0,
-      });
-
-      const nuevaReserva = await tx.reserva.create({
-        data: {
-          barberoId,
-          servicioId,
-          fecha: fechaColumna,
-          hora,
-          clienteNombre,
-          clienteTelefono,
-          clienteEmail,
-          direccionCliente: servicio.aDomicilio ? direccionCliente : undefined,
-          estado: "CONFIRMADA",
-        },
-      });
-
-      // Notificacion de confirmacion: se encola aca (dentro de la misma
-      // transaccion que crea la reserva) y se procesa/envia justo despues,
-      // fuera de la transaccion.
-      await tx.notificacion.create({
-        data: {
-          reservaId: nuevaReserva.id,
-          tipo: "CONFIRMACION",
-          canal: "EMAIL",
-          destinatario: clienteEmail,
-        },
-      });
-
-      return nuevaReserva;
+    const reserva = await crearReserva({
+      barberoId,
+      servicioId,
+      fecha: parseFechaColumna(fecha),
+      hora,
+      clienteNombre,
+      clienteTelefono,
+      clienteEmail,
+      direccionCliente,
     });
-
-    try {
-      await procesarNotificacionesPendientes(reserva.id);
-    } catch (error) {
-      console.error("Error procesando notificaciones:", error);
-    }
 
     return NextResponse.json(
       {
         id: reserva.id,
         token: reserva.token,
         estado: reserva.estado,
+        estadoPago: reserva.estadoPago,
+        montoSena: reserva.montoSena,
+        pagoUrl: reserva.pagoUrl,
         fecha,
         hora: reserva.hora,
       },

@@ -5,7 +5,8 @@ const TEXTOS: Record<string, { titulo: string; detalle: string }> = {
   },
   PRO: {
     titulo: "Plan Pro",
-    detalle: "Barberos ilimitados y servicios a domicilio habilitados.",
+    detalle:
+      "Barberos ilimitados, servicios a domicilio, multi-sucursal, dominio propio y seña con Wompi.",
   },
 };
 

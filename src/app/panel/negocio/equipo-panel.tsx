@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Field, Input, Label } from "@/components/ui/field";
+import { Field, Input, Label, Select } from "@/components/ui/field";
 
 type Barbero = {
   id: string;
@@ -11,10 +11,15 @@ type Barbero = {
   email: string;
   telefono: string | null;
   activo: boolean;
+  sucursalId: string | null;
+  sucursal: { nombre: string } | null;
 };
+
+type Sucursal = { id: string; nombre: string };
 
 export function EquipoPanel() {
   const [barberos, setBarberos] = useState<Barbero[]>([]);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,14 +27,20 @@ export function EquipoPanel() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [sucursalId, setSucursalId] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   async function cargar() {
     setCargando(true);
     try {
-      const res = await fetch("/api/panel/barberos");
-      const data = await res.json();
-      if (res.ok) setBarberos(data);
+      const [resBarberos, resSucursales] = await Promise.all([
+        fetch("/api/panel/barberos"),
+        fetch("/api/panel/sucursales"),
+      ]);
+      const dataBarberos = await resBarberos.json();
+      const dataSucursales = await resSucursales.json();
+      if (resBarberos.ok) setBarberos(dataBarberos);
+      if (resSucursales.ok) setSucursales(dataSucursales);
     } finally {
       setCargando(false);
     }
@@ -48,7 +59,13 @@ export function EquipoPanel() {
       const res = await fetch("/api/panel/barberos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, password, telefono: telefono || undefined }),
+        body: JSON.stringify({
+          nombre,
+          email,
+          password,
+          telefono: telefono || undefined,
+          sucursalId: sucursalId || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -59,6 +76,7 @@ export function EquipoPanel() {
       setEmail("");
       setPassword("");
       setTelefono("");
+      setSucursalId("");
       await cargar();
     } finally {
       setEnviando(false);
@@ -70,6 +88,15 @@ export function EquipoPanel() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ activo: !barbero.activo }),
+    });
+    await cargar();
+  }
+
+  async function asignarSucursal(barbero: Barbero, nuevaSucursalId: string) {
+    await fetch(`/api/panel/barberos/${barbero.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sucursalId: nuevaSucursalId || null }),
     });
     await cargar();
   }
@@ -109,6 +136,20 @@ export function EquipoPanel() {
             <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
           </Field>
 
+          {sucursales.length > 0 && (
+            <Field>
+              <Label>Sede</Label>
+              <Select value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {sucursales.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
           <Button type="submit" disabled={enviando}>
             Agregar
           </Button>
@@ -125,16 +166,35 @@ export function EquipoPanel() {
             <p className="p-4 text-sm text-fg-muted">Todavía no agregaste barberos.</p>
           )}
           {barberos.map((b) => (
-            <div key={b.id} className="flex items-center justify-between p-4">
+            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
               <span className={`text-sm ${b.activo ? "" : "text-fg-muted line-through"}`}>
                 {b.nombre} — {b.email}
+                {b.sucursal && (
+                  <span className="ml-2 text-xs text-fg-muted">({b.sucursal.nombre})</span>
+                )}
               </span>
-              <button
-                onClick={() => toggleActivo(b)}
-                className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:text-fg"
-              >
-                {b.activo ? "Desactivar" : "Activar"}
-              </button>
+              <div className="flex items-center gap-2">
+                {sucursales.length > 0 && (
+                  <select
+                    value={b.sucursalId ?? ""}
+                    onChange={(e) => asignarSucursal(b, e.target.value)}
+                    className="rounded-md border border-border bg-bg-elevated px-2 py-1 text-xs"
+                  >
+                    <option value="">Sin asignar</option>
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={() => toggleActivo(b)}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:text-fg"
+                >
+                  {b.activo ? "Desactivar" : "Activar"}
+                </button>
+              </div>
             </div>
           ))}
         </Card>

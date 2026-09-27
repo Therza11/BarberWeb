@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ESTADOS_ACTIVOS } from "@/lib/reservas";
 import { procesarNotificacionesPendientes } from "@/lib/notificaciones/procesar";
+import { notificarListaEspera } from "@/lib/lista-espera";
 
 export async function POST(
   _request: NextRequest,
@@ -11,7 +12,7 @@ export async function POST(
 
   const reserva = await prisma.reserva.findUnique({
     where: { token },
-    select: { id: true, estado: true, clienteEmail: true },
+    select: { id: true, estado: true, clienteEmail: true, barberoId: true, servicioId: true, fecha: true },
   });
 
   if (!reserva) {
@@ -44,6 +45,12 @@ export async function POST(
     await procesarNotificacionesPendientes(reserva.id);
   } catch (error) {
     console.error("Error procesando notificaciones:", error);
+  }
+
+  try {
+    await notificarListaEspera(reserva.barberoId, reserva.servicioId, reserva.fecha);
+  } catch (error) {
+    console.error("Error notificando lista de espera:", error);
   }
 
   return NextResponse.json({ estado: "CANCELADA" });

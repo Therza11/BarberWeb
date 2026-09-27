@@ -24,11 +24,29 @@ export async function PATCH(
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   }
 
-  let body: { activo?: boolean };
+  let body: { activo?: boolean; sucursalId?: string | null };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
+  }
+
+  if (body.sucursalId !== undefined) {
+    if (body.sucursalId !== null) {
+      const sucursal = await prisma.sucursal.findUnique({
+        where: { id: body.sucursalId },
+        select: { negocioId: true },
+      });
+      if (!sucursal || sucursal.negocioId !== session.user.negocioId) {
+        return NextResponse.json({ error: "Sucursal invalida" }, { status: 400 });
+      }
+    }
+
+    const actualizado = await prisma.barbero.update({
+      where: { id },
+      data: { sucursalId: body.sucursalId },
+    });
+    return NextResponse.json({ id: actualizado.id, sucursalId: actualizado.sucursalId });
   }
 
   if (typeof body.activo !== "boolean") {

@@ -4,6 +4,8 @@ const ESTILOS: Record<string, string> = {
   CANCELADA: "bg-danger/15 text-danger",
   COMPLETADA: "bg-fg/10 text-fg-muted",
   NO_ASISTIO: "bg-danger/10 text-danger",
+  ACTIVA: "bg-accent/15 text-accent",
+  NOTIFICADA: "bg-success/15 text-success",
 };
 
 export function EstadoBadge({ estado }: { estado: string }) {

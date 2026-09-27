@@ -16,10 +16,16 @@ export async function GET(
       fecha: true,
       hora: true,
       estado: true,
+      estadoPago: true,
+      montoSena: true,
+      serieId: true,
+      serieIndice: true,
+      serieTotal: true,
       clienteNombre: true,
       direccionCliente: true,
       barbero: { select: { nombre: true, negocio: { select: { nombre: true } } } },
       servicio: { select: { nombre: true, duracionMin: true, precio: true } },
+      resena: { select: { calificacion: true, comentario: true } },
     },
   });
 
@@ -33,6 +39,11 @@ export async function GET(
     fecha: reserva.fecha.toISOString().slice(0, 10),
     hora: reserva.hora,
     estado: reserva.estado,
+    estadoPago: reserva.estadoPago,
+    montoSena: reserva.montoSena?.toString() ?? null,
+    serieId: reserva.serieId,
+    serieIndice: reserva.serieIndice,
+    serieTotal: reserva.serieTotal,
     clienteNombre: reserva.clienteNombre,
     direccionCliente: reserva.direccionCliente,
     negocio: reserva.barbero.negocio.nombre,
@@ -40,5 +51,6 @@ export async function GET(
     servicio: reserva.servicio.nombre,
     duracionMin: reserva.servicio.duracionMin,
     precio: reserva.servicio.precio.toString(),
+    resena: reserva.resena,
   });
 }

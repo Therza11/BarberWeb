@@ -1,9 +1,33 @@
+import { randomUUID } from "crypto";
 import type { Prisma } from "@/generated/prisma/client";
-import { horaAMinutos, seSuperponen } from "@/lib/horarios";
+import { prisma } from "@/lib/prisma";
+import { calcularSlotsLibres, horaAMinutos, seSuperponen } from "@/lib/horarios";
+import {
+  SENA_EXPIRACION_MIN,
+  calcularMontoSena,
+  construirUrlCheckout,
+  wompiConfigurado,
+} from "@/lib/pagos/wompi";
+import { obtenerAppUrl } from "@/lib/notificaciones/mensajes";
+import { procesarNotificacionesPendientes } from "@/lib/notificaciones/procesar";
 
 type TxClient = Prisma.TransactionClient;
 
 export const ESTADOS_ACTIVOS = ["PENDIENTE", "CONFIRMADA"] as const;
+
+/**
+ * Condicion Prisma para excluir reservas PENDIENTE con un pago de sena que
+ * nunca se completo (el cliente abrio el checkout de Wompi y no volvio):
+ * pasados SENA_EXPIRACION_MIN minutos, el slot vuelve a contar como libre
+ * aunque el cron diario todavia no la haya marcado CANCELADA formalmente
+ * (ver src/lib/pagos/expirar.ts).
+ */
+export function excluirPagosVencidos(): Prisma.ReservaWhereInput {
+  const limite = new Date(Date.now() - SENA_EXPIRACION_MIN * 60_000);
+  return {
+    NOT: { estado: "PENDIENTE", estadoPago: "PENDIENTE", creadoEn: { lt: limite } },
+  };
+}
 
 export class SlotNoDisponibleError extends Error {}
 
@@ -48,6 +72,7 @@ export async function verificarSlotLibre(
       barberoId,
       fecha,
       estado: { in: [...ESTADOS_ACTIVOS] },
+      ...excluirPagosVencidos(),
       ...(excluirReservaId ? { id: { not: excluirReservaId } } : {}),
     },
     select: {
@@ -99,4 +124,222 @@ export async function verificarDentroDeDisponibilidad(
   if (!dentroDeAlguna) {
     throw new SlotNoDisponibleError("El barbero no tiene disponibilidad en ese horario");
   }
+}
+
+/**
+ * Slots libres para un barbero+servicio en una fecha dada. Compartido entre
+ * `GET /api/disponibilidad` y el bot de WhatsApp para no duplicar la consulta
+ * de ventanas/reservas ocupadas en dos lugares.
+ */
+export async function obtenerSlotsLibres(params: {
+  barberoId: string;
+  servicioId: string;
+  fecha: Date;
+}): Promise<{ slots: string[] } | { error: string }> {
+  const { barberoId, servicioId, fecha } = params;
+  const diaSemana = fecha.getUTCDay();
+
+  const servicio = await prisma.servicio.findUnique({
+    where: { id: servicioId },
+    select: { duracionMin: true, activo: true, aDomicilio: true, tiempoTrasladoMin: true },
+  });
+
+  if (!servicio || !servicio.activo) {
+    return { error: "Servicio no encontrado" };
+  }
+
+  const [ventanas, reservasActivas] = await Promise.all([
+    prisma.disponibilidad.findMany({
+      where: { barberoId, diaSemana, activo: true },
+      select: { horaInicio: true, horaFin: true },
+    }),
+    prisma.reserva.findMany({
+      where: {
+        barberoId,
+        fecha,
+        estado: { in: [...ESTADOS_ACTIVOS] },
+        ...excluirPagosVencidos(),
+      },
+      select: {
+        hora: true,
+        servicio: { select: { duracionMin: true, aDomicilio: true, tiempoTrasladoMin: true } },
+      },
+    }),
+  ]);
+
+  const ocupadas = reservasActivas.map((r) => ({
+    hora: r.hora,
+    duracionMin: r.servicio.duracionMin,
+    bufferTrasladoMin: r.servicio.aDomicilio ? r.servicio.tiempoTrasladoMin ?? 0 : 0,
+  }));
+
+  const bufferMin = servicio.aDomicilio ? servicio.tiempoTrasladoMin ?? 0 : 0;
+  const slots = calcularSlotsLibres(ventanas, ocupadas, servicio.duracionMin, 15, bufferMin);
+
+  return { slots };
+}
+
+export type CrearReservaInput = {
+  barberoId: string;
+  servicioId: string;
+  fecha: Date; // ya parseada con parseFechaColumna
+  hora: string;
+  clienteNombre: string;
+  clienteTelefono: string;
+  clienteEmail: string;
+  direccionCliente?: string;
+};
+
+export type CrearReservaResultado = {
+  id: string;
+  token: string;
+  estado: string;
+  estadoPago: string;
+  montoSena: string | null;
+  pagoUrl: string | null;
+  fecha: Date;
+  hora: string;
+};
+
+/**
+ * Logica completa de creacion de una reserva (concurrencia, disponibilidad,
+ * sena via Wompi, notificacion de confirmacion). Compartida entre
+ * `POST /api/reservas` y el bot de WhatsApp (src/lib/whatsapp-bot.ts) para
+ * que ambos canales tengan exactamente las mismas garantias - nada de logica
+ * de reserva duplicada/divergente entre el flujo web y el de chat.
+ */
+export async function crearReserva(input: CrearReservaInput): Promise<CrearReservaResultado> {
+  const {
+    barberoId,
+    servicioId,
+    fecha,
+    hora,
+    clienteNombre,
+    clienteTelefono,
+    clienteEmail,
+    direccionCliente,
+  } = input;
+
+  const { reserva, pagoUrl } = await prisma.$transaction(async (tx) => {
+    await bloquearBarbero(tx, barberoId);
+
+    const [servicio, barbero] = await Promise.all([
+      tx.servicio.findUnique({
+        where: { id: servicioId },
+        select: {
+          id: true,
+          activo: true,
+          duracionMin: true,
+          precio: true,
+          aDomicilio: true,
+          tiempoTrasladoMin: true,
+        },
+      }),
+      tx.barbero.findUnique({
+        where: { id: barberoId },
+        select: { negocio: { select: { requiereSena: true, senaPorcentaje: true } } },
+      }),
+    ]);
+
+    if (!servicio || !servicio.activo) {
+      throw new SlotNoDisponibleError("Servicio no encontrado");
+    }
+
+    if (!barbero) {
+      throw new SlotNoDisponibleError("Barbero no encontrado");
+    }
+
+    if (servicio.aDomicilio && !direccionCliente) {
+      throw new SlotNoDisponibleError(
+        "Este servicio es a domicilio: falta la direccion del cliente",
+      );
+    }
+
+    await verificarDentroDeDisponibilidad(tx, {
+      barberoId,
+      fecha,
+      hora,
+      duracionMin: servicio.duracionMin,
+    });
+
+    await verificarSlotLibre(tx, {
+      barberoId,
+      fecha,
+      hora,
+      duracionMin: servicio.duracionMin,
+      bufferTrasladoMin: servicio.aDomicilio ? servicio.tiempoTrasladoMin ?? 0 : 0,
+    });
+
+    const pideSena = barbero.negocio.requiereSena && barbero.negocio.senaPorcentaje != null;
+    const montoSena = pideSena
+      ? calcularMontoSena(Number(servicio.precio), Number(barbero.negocio.senaPorcentaje))
+      : null;
+    const cobroReal = pideSena && wompiConfigurado();
+
+    const id = randomUUID();
+    const token = randomUUID();
+    const wompiReferencia = cobroReal ? `sena-${id}` : undefined;
+
+    let pagoUrl: string | null = null;
+    if (cobroReal && wompiReferencia) {
+      pagoUrl = construirUrlCheckout({
+        referencia: wompiReferencia,
+        montoEnCentavos: Math.round(montoSena! * 100),
+        redirectUrl: `${obtenerAppUrl()}/reserva/${token}`,
+        nombreCliente: clienteNombre,
+        emailCliente: clienteEmail,
+      });
+    }
+
+    const nuevaReserva = await tx.reserva.create({
+      data: {
+        id,
+        token,
+        barberoId,
+        servicioId,
+        fecha,
+        hora,
+        clienteNombre,
+        clienteTelefono,
+        clienteEmail,
+        direccionCliente: servicio.aDomicilio ? direccionCliente : undefined,
+        estado: cobroReal ? "PENDIENTE" : "CONFIRMADA",
+        estadoPago: pideSena ? (cobroReal ? "PENDIENTE" : "PAGADO") : "NO_APLICA",
+        montoSena: montoSena ?? undefined,
+        wompiReferencia,
+      },
+    });
+
+    if (nuevaReserva.estado === "CONFIRMADA") {
+      await tx.notificacion.create({
+        data: {
+          reservaId: nuevaReserva.id,
+          tipo: "CONFIRMACION",
+          canal: "EMAIL",
+          destinatario: clienteEmail,
+        },
+      });
+    }
+
+    return { reserva: nuevaReserva, pagoUrl };
+  });
+
+  if (reserva.estado === "CONFIRMADA") {
+    try {
+      await procesarNotificacionesPendientes(reserva.id);
+    } catch (error) {
+      console.error("Error procesando notificaciones:", error);
+    }
+  }
+
+  return {
+    id: reserva.id,
+    token: reserva.token,
+    estado: reserva.estado,
+    estadoPago: reserva.estadoPago,
+    montoSena: reserva.montoSena?.toString() ?? null,
+    pagoUrl,
+    fecha: reserva.fecha,
+    hora: reserva.hora,
+  };
 }

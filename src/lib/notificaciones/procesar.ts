@@ -22,6 +22,8 @@ export async function procesarNotificacionesPendientes(reservaId?: string) {
           fecha: true,
           hora: true,
           token: true,
+          serieId: true,
+          serieTotal: true,
           barbero: { select: { nombre: true, negocio: { select: { nombre: true } } } },
           servicio: { select: { nombre: true } },
         },
@@ -41,6 +43,8 @@ export async function procesarNotificacionesPendientes(reservaId?: string) {
       fecha: notificacion.reserva.fecha.toISOString().slice(0, 10),
       hora: notificacion.reserva.hora,
       token: notificacion.reserva.token,
+      serieId: notificacion.reserva.serieId,
+      serieTotal: notificacion.reserva.serieTotal,
     });
 
     try {

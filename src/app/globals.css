@@ -10,6 +10,16 @@
   --accent: #c9a24a;
   --accent-hover: #ddb95c;
   --accent-fg: #14100c;
+  --accent-deep: #96701f;
+  --accent-bright: #f2d896;
+  --accent-gradient: linear-gradient(
+    135deg,
+    var(--accent-deep) 0%,
+    var(--accent) 30%,
+    var(--accent-bright) 50%,
+    var(--accent) 70%,
+    var(--accent-deep) 100%
+  );
   --danger: #c0503f;
   --danger-fg: #f3ead9;
   --success: #5a9a6f;
@@ -25,6 +35,8 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-bright: var(--accent-bright);
   --color-danger: var(--danger);
   --color-danger-fg: var(--danger-fg);
   --color-success: var(--success);
@@ -44,4 +56,13 @@ h3,
 h4 {
   font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0.01em;
+}
+
+/* Texto con el degrade dorado del logo (brushed metal) - usar con moderacion,
+   solo en momentos de marca fuertes (hero, login), no en UI utilitaria. */
+.text-gradient-gold {
+  background: var(--accent-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }

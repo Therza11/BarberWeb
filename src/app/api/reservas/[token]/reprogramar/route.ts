@@ -9,6 +9,7 @@ import {
   verificarDentroDeDisponibilidad,
   verificarSlotLibre,
 } from "@/lib/reservas";
+import { notificarListaEspera } from "@/lib/lista-espera";
 
 export async function POST(
   request: NextRequest,
@@ -48,7 +49,9 @@ export async function POST(
         select: {
           id: true,
           barberoId: true,
+          servicioId: true,
           estado: true,
+          fecha: true,
           servicio: { select: { duracionMin: true, aDomicilio: true, tiempoTrasladoMin: true } },
         },
       });
@@ -84,16 +87,28 @@ export async function POST(
         excluirReservaId: reserva.id,
       });
 
-      return tx.reserva.update({
+      const actualizada = await tx.reserva.update({
         where: { id: reserva.id },
         data: { fecha: fechaColumna, hora },
       });
+
+      return { actualizada, fechaVieja: reserva.fecha, barberoId: reserva.barberoId, servicioId: reserva.servicioId };
     });
+
+    const { actualizada, fechaVieja, barberoId, servicioId } = reservaActualizada;
+
+    if (fechaVieja.getTime() !== fechaColumna.getTime()) {
+      try {
+        await notificarListaEspera(barberoId, servicioId, fechaVieja);
+      } catch (error) {
+        console.error("Error notificando lista de espera:", error);
+      }
+    }
 
     return NextResponse.json({
       fecha,
-      hora: reservaActualizada.hora,
-      estado: reservaActualizada.estado,
+      hora: actualizada.hora,
+      estado: actualizada.estado,
     });
   } catch (error) {
     if (error instanceof SlotNoDisponibleError) {

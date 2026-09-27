@@ -8,9 +8,11 @@ type DatosReserva = {
   fecha: string;
   hora: string;
   token: string;
+  serieId?: string | null;
+  serieTotal?: number | null;
 };
 
-function obtenerAppUrl(): string {
+export function obtenerAppUrl(): string {
   if (process.env.APP_URL) return process.env.APP_URL;
   if (process.env.NODE_ENV === "production") {
     // Fallar fuerte en vez de mandar links a localhost a clientes reales
@@ -25,6 +27,10 @@ function obtenerAppUrl(): string {
 export function armarMensaje(tipo: TipoNotificacion, r: DatosReserva): string {
   switch (tipo) {
     case "CONFIRMACION": {
+      if (r.serieId && r.serieTotal && r.serieTotal > 1) {
+        const linkSerie = `${obtenerAppUrl()}/reserva/serie/${r.serieId}`;
+        return `Hola ${r.clienteNombre}! Se confirmaron tus ${r.serieTotal} turnos recurrentes en ${r.negocio} con ${r.barbero} (${r.servicio}), empezando el ${r.fecha} a las ${r.hora}. Para ver todas las fechas y cancelar o reprogramar cada una: ${linkSerie}`;
+      }
       const link = `${obtenerAppUrl()}/reserva/${r.token}`;
       return `Hola ${r.clienteNombre}! Tu turno en ${r.negocio} con ${r.barbero} (${r.servicio}) quedo confirmado para el ${r.fecha} a las ${r.hora}. Para cancelar o reprogramar: ${link}`;
     }

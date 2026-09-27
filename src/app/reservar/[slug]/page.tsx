@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { obtenerPromediosPorBarbero } from "@/lib/resenas";
 import { Brand } from "@/components/ui/brand";
 import { Container } from "@/components/ui/container";
 import { Card } from "@/components/ui/card";
@@ -18,9 +19,15 @@ export default async function ReservarPage({
       id: true,
       nombre: true,
       direccion: true,
+      requiereSena: true,
       barberos: {
         where: { activo: true },
-        select: { id: true, nombre: true },
+        select: { id: true, nombre: true, sucursalId: true },
+      },
+      sucursales: {
+        where: { activo: true },
+        select: { id: true, nombre: true, direccion: true, ciudad: true },
+        orderBy: { nombre: "asc" },
       },
       servicios: {
         where: { activo: true },
@@ -39,6 +46,13 @@ export default async function ReservarPage({
     notFound();
   }
 
+  const promedios = await obtenerPromediosPorBarbero(negocio.barberos.map((b) => b.id));
+  const barberosConRating = negocio.barberos.map((b) => ({
+    ...b,
+    promedio: promedios.get(b.id)?.promedio ?? null,
+    cantidadResenas: promedios.get(b.id)?.cantidad ?? 0,
+  }));
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border px-4 py-5">
@@ -54,9 +68,22 @@ export default async function ReservarPage({
           <p className="mt-1 text-sm text-fg-muted">{negocio.direccion}</p>
         )}
 
+        {process.env.WHATSAPP_DISPLAY_NUMBER && (
+          <a
+            href={`https://wa.me/${process.env.WHATSAPP_DISPLAY_NUMBER}?text=${encodeURIComponent(`Hola, quiero reservar en ${slug}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-2 rounded-md border border-success/40 px-3 py-2 text-sm text-success hover:bg-success/10"
+          >
+            Reservar por WhatsApp
+          </a>
+        )}
+
         <Card className="mt-6">
           <ReservaForm
-            barberos={negocio.barberos}
+            barberos={barberosConRating}
+            sucursales={negocio.sucursales}
+            permiteRecurrente={!negocio.requiereSena}
             servicios={negocio.servicios.map((s) => ({
               ...s,
               precio: s.precio.toString(),

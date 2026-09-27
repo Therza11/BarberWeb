@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Field, Label, Select } from "@/components/ui/field";
+import { StarsDisplay } from "@/components/ui/stars";
 
 type Negocio = {
   nombre: string;
@@ -10,6 +11,8 @@ type Negocio = {
   ciudad: string | null;
   direccion: string | null;
   cantidadBarberos: number;
+  promedio: number | null;
+  cantidadResenas: number;
 };
 
 export function DirectorioLista() {
@@ -82,7 +85,10 @@ export function DirectorioLista() {
                 {n.direccion && (
                   <p className="mt-1 text-sm text-fg-muted">{n.direccion}</p>
                 )}
-                <p className="mt-2 text-xs text-fg-muted">
+                <div className="mt-2">
+                  <StarsDisplay promedio={n.promedio} cantidad={n.cantidadResenas} size="text-xs" />
+                </div>
+                <p className="mt-1 text-xs text-fg-muted">
                   {n.cantidadBarberos}{" "}
                   {n.cantidadBarberos === 1 ? "barbero" : "barberos"}
                 </p>

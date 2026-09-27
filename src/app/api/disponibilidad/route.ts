@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { calcularSlotsLibres } from "@/lib/horarios";
-
-// Interpreta "YYYY-MM-DD" como fecha local (sin desplazamiento de zona horaria)
-// y devuelve tanto el Date (medianoche UTC, como se guarda en la columna @db.Date)
-// como el dia de la semana (0=Domingo..6=Sabado) segun esa fecha calendario.
-function parseFecha(fechaStr: string): { fecha: Date; diaSemana: number } {
-  const [anio, mes, dia] = fechaStr.split("-").map(Number);
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
-  const diaSemana = fecha.getUTCDay();
-  return { fecha, diaSemana };
-}
+import { obtenerSlotsLibres, parseFechaColumna } from "@/lib/reservas";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -32,43 +21,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const servicio = await prisma.servicio.findUnique({
-    where: { id: servicioId },
-    select: { duracionMin: true, activo: true, aDomicilio: true, tiempoTrasladoMin: true },
+  const resultado = await obtenerSlotsLibres({
+    barberoId,
+    servicioId,
+    fecha: parseFechaColumna(fechaStr),
   });
 
-  if (!servicio || !servicio.activo) {
-    return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
+  if ("error" in resultado) {
+    return NextResponse.json({ error: resultado.error }, { status: 404 });
   }
 
-  const { fecha, diaSemana } = parseFecha(fechaStr);
-
-  const [ventanas, reservasActivas] = await Promise.all([
-    prisma.disponibilidad.findMany({
-      where: { barberoId, diaSemana, activo: true },
-      select: { horaInicio: true, horaFin: true },
-    }),
-    prisma.reserva.findMany({
-      where: {
-        barberoId,
-        fecha,
-        estado: { in: ["PENDIENTE", "CONFIRMADA"] },
-      },
-      select: {
-        hora: true,
-        servicio: { select: { duracionMin: true, aDomicilio: true, tiempoTrasladoMin: true } },
-      },
-    }),
-  ]);
-
-  const ocupadas = reservasActivas.map((r) => ({
-    hora: r.hora,
-    duracionMin: r.servicio.duracionMin,
-    bufferTrasladoMin: r.servicio.aDomicilio ? r.servicio.tiempoTrasladoMin ?? 0 : 0,
-  }));
-
-  const bufferMin = servicio.aDomicilio ? servicio.tiempoTrasladoMin ?? 0 : 0;
-  const slots = calcularSlotsLibres(ventanas, ocupadas, servicio.duracionMin, 15, bufferMin);
-
-  return NextResponse.json({ fecha: fechaStr, slots });
+  return NextResponse.json({ fecha: fechaStr, slots: resultado.slots });
 }

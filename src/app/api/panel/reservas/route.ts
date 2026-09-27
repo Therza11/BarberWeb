@@ -22,6 +22,8 @@ export async function GET() {
       fecha: true,
       hora: true,
       estado: true,
+      serieIndice: true,
+      serieTotal: true,
       servicio: { select: { nombre: true, precio: true, aDomicilio: true } },
     },
   });

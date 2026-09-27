@@ -10,6 +10,8 @@ type Turno = {
   fecha: string;
   hora: string;
   estado: string;
+  serieIndice: number | null;
+  serieTotal: number | null;
   servicio: { nombre: string; precio: string; aDomicilio: boolean };
 };
 
@@ -50,6 +52,11 @@ export function MisTurnos() {
           <span className="text-sm">
             {t.fecha} {t.hora} — {t.clienteNombre}{" "}
             <span className="text-fg-muted">({t.servicio.nombre})</span>
+            {t.serieIndice && t.serieTotal && t.serieTotal > 1 && (
+              <span className="ml-1 rounded-full bg-accent/15 px-1.5 py-0.5 text-xs text-accent">
+                {t.serieIndice}/{t.serieTotal}
+              </span>
+            )}
             {t.servicio.aDomicilio && t.direccionCliente && (
               <span className="mt-1 block text-xs text-accent">
                 Domicilio: {t.direccionCliente}
